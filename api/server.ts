@@ -67,23 +67,26 @@ app.get('/', (_req: Request, res: Response) => {
 
 // Endpoint to save a conversation
 app.post('/saveConversation', apiLimiter, validateConversationRequest, asyncHandler(async (req: Request, res: Response) => {
-    const { discordId, userMessage, botResponse } = req.body;
-    await saveConversation(discordId, userMessage, botResponse);
+    const { discordId, channelId, userMessage, botResponse } = req.body;
+    await saveConversation(discordId, channelId, userMessage, botResponse);
     res.status(200).json({ message: 'Conversation saved successfully' });
 }));
 
-// Endpoint to get a conversation by Discord ID
-app.get('/getConversation/:discordId', validateDiscordIdParam, asyncHandler(async (req: Request, res: Response) => {
-    const { discordId } = req.params;
-    const conversation = await getUserConversation(discordId);
+// Endpoint to get a conversation by Discord ID and Channel ID
+app.get('/getConversation/:discordId/:channelId', validateDiscordIdParam, asyncHandler(async (req: Request, res: Response) => {
+    const { discordId, channelId } = req.params;
+    console.log(`Received request for discordId: ${discordId}, channelId: ${channelId}`);
+    const conversation = await getUserConversation(discordId, channelId);
 
-        if (!conversation) {
-            res.status(404).json({ message: 'Conversation not found.' });
-        } else {
-            res.status(200).json(conversation);
-        }
-    })
-);
+    if (!conversation) {
+        console.log('Convo not found.');
+        res.status(404).json({ message: 'Conversation not found.' });
+    } else {
+        console.log('Sending conversation data')
+        res.status(200).json(conversation);
+    }
+}));
+
 
 // Error handling middleware
 app.use(

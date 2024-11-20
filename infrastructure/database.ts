@@ -24,6 +24,7 @@ interface DailyConversation {
 
 interface Conversation {
   discordId: string;
+  channelId: string;
   conversations: DailyConversation[];
 }
 
@@ -40,8 +41,8 @@ export async function connectToDatabase(): Promise<void> {
         collection = db.collection<Conversation>('conversations');
         console.log('Connected to MongoDB and initialized conversations collection');
 
-        // Optionally create an index on `discordId` to optimize lookups
-        await collection.createIndex({ discordId: 1 });
+        // Optionally create an index on `discordId` and `channelId` to optimize lookups
+        await collection.createIndex({ discordId: 1, channelId: 1 });
       } else {
         console.log('MongoDB connection already established.');
       }
@@ -58,6 +59,7 @@ export async function connectToDatabase(): Promise<void> {
 // Save a conversation to MongoDB
 export async function saveConversation(
   discordId: string,
+  channelId: string,
   userMessage: string,
   botResponse: string
 ): Promise<void> {
@@ -66,7 +68,7 @@ export async function saveConversation(
   const newEntry: ConversationEntry = { userMessage, botResponse, timestamp };
 
   try {
-    const existingConversation = await collection.findOne({ discordId });
+    const existingConversation = await collection.findOne({ discordId, channelId });
 
     if (existingConversation) {
       const existingDailyConversation = existingConversation.conversations.find(
@@ -75,18 +77,19 @@ export async function saveConversation(
 
       if (existingDailyConversation) {
         await collection.updateOne(
-          { discordId, 'conversations.date': date },
+          { discordId, channelId, 'conversations.date': date },
           { $push: { 'conversations.$.entries': newEntry } }
         );
       } else {
         await collection.updateOne(
-          { discordId },
+          { discordId, channelId },
           { $push: { conversations: { date, entries: [newEntry] } } }
         );
       }
     } else {
       const newConversation: Conversation = {
         discordId,
+        channelId,
         conversations: [{ date, entries: [newEntry] }],
       };
       await collection.insertOne(newConversation);
@@ -99,15 +102,16 @@ export async function saveConversation(
   }
 }
 
-// Retrieve a user's conversation
+// Retrieve a user's conversation by Discord ID and Channel ID
 export async function getUserConversation(
   discordId: string,
+  channelId: string,
   date?: string
 ): Promise<Conversation | null> {
   try {
     const query = date
-      ? { discordId, 'conversations.date': date }
-      : { discordId };
+      ? { discordId, channelId, 'conversations.date': date }
+      : { discordId, channelId };
 
     const projection = date ? { 'conversations.$': 1 } : undefined;
     const conversation = await collection.findOne(query, { projection });
